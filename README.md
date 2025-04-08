@@ -2,7 +2,7 @@
 Header only implementation(s) of a fast sudoku solver.
 
 ## To build:
-run 'make'
+Edit flags of and run makefile.
 
 ## To use:
 Submit sudoku rows as args, valid tile values are 1-9 and '.' to represent an empty tile.
