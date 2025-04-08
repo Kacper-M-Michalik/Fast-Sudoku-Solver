@@ -59,11 +59,11 @@ int main(int count, char* argv[])
     PrintBoard(solvedBoard);
 
     clock_t begin = clock();
-    bool Solved = Solve(solvedBoard);
+    bool solved = Solve(solvedBoard);
     clock_t end = clock();
     double timeSpent = (double)(end - begin) / CLOCKS_PER_SEC;
 
-    if (Solved)
+    if (solved)
     {
         printf("\nSolved Board in %lfs:\n", timeSpent);
         PrintBoard(solvedBoard);
