@@ -7,10 +7,10 @@ run 'make'
 ## To use:
 Submit sudoku rows as args, valid tile values are 1-9 and '.' to represent an empty tile.
 
-Example input:
+Example input:\
 './Solver 8...6.... .2....9.. 9...17..8 .5..74.1. ...2....4 7..6..... 2...98..1 ..3....5. ...4.....'
 
-Example output:
+Example output:\
 Starting Board:\
 8 0 0 0 6 0 0 0 0\
 0 2 0 0 0 0 9 0 0\
