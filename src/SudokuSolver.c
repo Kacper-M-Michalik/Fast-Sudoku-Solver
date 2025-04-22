@@ -1,48 +1,29 @@
-#pragma once
-
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
 
-#define BOARDSIZE 9
-#define TILESIZE 3
+#include "SudokuSolver.h"
 
-typedef struct backtrackResult
-{
-    size_t x;
-    size_t y;
-    uint8_t AssumedValue;
-    bool Complete;
-} BacktrackResult;
-
-bool Solve(uint8_t* solvedBoard);
-
-BacktrackResult BacktrackGuess(uint8_t* finalSolvedBoard, uint8_t* solvedBoard, uint16_t* sourceConstraintBoard);
-
-bool IntialiseConstraint(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos);
-
-void UpdateBoard(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos);
-
-uint8_t GetBitInt(uint16_t value);
-
-void PrintBoard(uint8_t* solvedBoard);
-
-void PrintConstraintBoard(uint16_t* constraintBoard);
+static BacktrackResult BacktrackGuess(uint8_t* finalSolvedBoard, uint8_t* sourceSolvedBoard, uint16_t* sourceConstraintBoard);
+static bool IntialiseConstraint(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos);
+static void UpdateBoard(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos);
+static uint8_t GetBitInt(const uint16_t value);
+static void PrintConstraintBoard(const uint16_t* constraintBoard);
 
 
-bool Solve(uint8_t* solvedBoard)
+bool Solve(Board* board)
 {   
-    uint16_t constraintBoard[BOARDSIZE * BOARDSIZE] = {[0 ... BOARDSIZE * BOARDSIZE - 1] = 511}; //Pad?
+    uint16_t constraintBoard[BOARDSIZE * BOARDSIZE] = {[0 ... BOARDSIZE * BOARDSIZE - 1] = 511};
     
     //Set initial constraints and validate start
     for (size_t y = 0; y < BOARDSIZE; y++)
     {
         for (size_t x = 0; x < BOARDSIZE; x++)
         {
-            const uint8_t number = solvedBoard[y * BOARDSIZE + x];
-            if (number != 0 && !IntialiseConstraint(solvedBoard, constraintBoard, number, x, y)) return false;
+            const uint8_t number = board->Data[y * BOARDSIZE + x];
+            if (number != 0 && !IntialiseConstraint(board->Data, constraintBoard, number, x, y)) return false;
         }
     }  
 
@@ -64,7 +45,7 @@ bool Solve(uint8_t* solvedBoard)
                     if (constraint && (constraint & (constraint - 1)) == 0)
                     {
                         FilledValue = true;
-                        UpdateBoard(solvedBoard, constraintBoard, GetBitInt(constraint), x, y);
+                        UpdateBoard(board->Data, constraintBoard, GetBitInt(constraint), x, y);
                     }
                     else if (constraint) Complete = false;
                 }
@@ -74,7 +55,7 @@ bool Solve(uint8_t* solvedBoard)
         if (Complete) return true;
 
         //Need to do backtrackable guessing
-        BacktrackResult result = BacktrackGuess(solvedBoard, solvedBoard, constraintBoard);    
+        BacktrackResult result = BacktrackGuess(board->Data, board->Data, constraintBoard);    
         if (result.Complete) return true;
         
         //Update constraint with failed guess
@@ -82,7 +63,19 @@ bool Solve(uint8_t* solvedBoard)
     }
 }
 
-BacktrackResult BacktrackGuess(uint8_t* finalSolvedBoard, uint8_t* sourceSolvedBoard, uint16_t* sourceConstraintBoard)
+void PrintBoard(const Board* board)
+{    
+    for (size_t y = 0; y < BOARDSIZE; y++)
+    {
+        for (size_t x = 0; x < BOARDSIZE; x++)
+        {
+            printf("%d ", board->Data[y * BOARDSIZE + x]);
+        }
+        printf("\n");
+    }    
+}
+
+static BacktrackResult BacktrackGuess(uint8_t* finalSolvedBoard, uint8_t* sourceSolvedBoard, uint16_t* sourceConstraintBoard)
 {
     uint8_t solvedBoard[BOARDSIZE * BOARDSIZE];
     memcpy(solvedBoard, sourceSolvedBoard, sizeof(solvedBoard));
@@ -104,10 +97,12 @@ BacktrackResult BacktrackGuess(uint8_t* finalSolvedBoard, uint8_t* sourceSolvedB
                 lowestBitCount = bitCount;
                 lowX = x;
                 lowY = y;
+                if (bitCount == 2) goto foundLikelyCell;
             }
-            //Add test to skip to end if bitCount == 2?
         }
     }
+
+foundLikelyCell:
 
     //Get lowest bit, convert to number, and guess it
     uint8_t guessValue = GetBitInt(((int16_t)constraintBoard[lowY * BOARDSIZE + lowX]) & -((int16_t)constraintBoard[lowY * BOARDSIZE + lowX]));
@@ -163,13 +158,15 @@ BacktrackResult BacktrackGuess(uint8_t* finalSolvedBoard, uint8_t* sourceSolvedB
     }
 }
 
-bool IntialiseConstraint(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos)
+static bool IntialiseConstraint(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos)
 {
     const size_t yOff = yPos * BOARDSIZE;  
     const size_t placementIndex = yPos * BOARDSIZE + xPos;  
 
     constraintBoard[yOff + xPos] = 0;
 
+    //Make sure to compile with optimisations to unroll these  
+    //Similiar to UpdateBoard but we also check that the board is valid         
     for (size_t i = yOff; i < yOff + BOARDSIZE; i++)
     {        
         constraintBoard[i] &= ~(1 << (value - 1));       
@@ -182,7 +179,6 @@ bool IntialiseConstraint(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_
         if (i != placementIndex && solvedBoard[i] == value) return false;
     }       
 
-    //Change to switch or else-chain instead?
     size_t tileOffX = 0;
     if (xPos >= 3) tileOffX = TILESIZE;
     if (xPos >= 6) tileOffX = 2 * TILESIZE;
@@ -203,13 +199,14 @@ bool IntialiseConstraint(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_
     return true;
 }
 
-void UpdateBoard(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos)
+static void UpdateBoard(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value, size_t xPos, size_t yPos)
 {
     const size_t yOff = yPos * BOARDSIZE;   
      
     solvedBoard[yOff + xPos] = value;
     constraintBoard[yOff + xPos] = 0;
 
+    //Make sure to compile with optimisations to unroll these        
     //Loop over row
     for (size_t i = yOff; i < yOff + BOARDSIZE; i++)
     {        
@@ -223,14 +220,13 @@ void UpdateBoard(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value,
         constraintBoard[i] &= ~(1 << (value - 1));
     }       
 
-    //Change to switch or else-chain instead?
+    //Loop over 3*3 tile
     size_t tileOffX = 0;
     if (xPos >= 3) tileOffX = TILESIZE;
     if (xPos >= 6) tileOffX = 2 * TILESIZE;
     size_t tileOffY = 0;
     if (yPos >= 3) tileOffY = TILESIZE * BOARDSIZE;
-    if (yPos >= 6) tileOffY = 2 * TILESIZE * BOARDSIZE;        
-    //Loop over tile
+    if (yPos >= 6) tileOffY = 2 * TILESIZE * BOARDSIZE;   
     for (size_t y = 0; y < TILESIZE; y++)
     {
         for (size_t x = 0; x < TILESIZE; x++)
@@ -240,7 +236,7 @@ void UpdateBoard(uint8_t* solvedBoard, uint16_t* constraintBoard, uint8_t value,
     }
 }
 
-uint8_t GetBitInt(uint16_t value)
+static uint8_t GetBitInt(const uint16_t value)
 {
     switch (value)
     {
@@ -263,33 +259,20 @@ uint8_t GetBitInt(uint16_t value)
         case 256u:
             return 9;    
         default:
-            printf("\nGetBitInt GRAVE ERROR: %d\n", value);
             return 0;
     }
 }
 
-void PrintBoard(uint8_t* solvedBoard)
-{    
-    for (size_t y = 0; y < BOARDSIZE * BOARDSIZE; y+= BOARDSIZE)
-    {
-        for (size_t x = 0; x < BOARDSIZE; x++)
-        {
-            printf("%d ", solvedBoard[y + x]);
-        }
-        printf("\n");
-    }    
-}
-
-void PrintConstraintBoard(uint16_t* constraintBoard)
+static void PrintConstraintBoard(const uint16_t* constraintBoard)
 {
-    for (size_t y = 0; y < BOARDSIZE * BOARDSIZE; y+= BOARDSIZE)
+    for (size_t y = 0; y < BOARDSIZE; y++)
     {
         for (size_t x = 0; x < BOARDSIZE; x++)
         {
             for (uint16_t mask = 256, num = 9; mask > 0; mask >>= 1, num--)
             {
                 //Print list of possible numbers, (_ if not possible)
-                if ((constraintBoard[y + x] & mask) > 0) printf("%d", num);
+                if ((constraintBoard[y * BOARDSIZE + x] & mask) > 0) printf("%d", num);
                 else printf("_");
             }
             printf(" ");

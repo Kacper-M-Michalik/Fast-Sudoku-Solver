@@ -1,8 +1,8 @@
 # FastSudokuSolver
-Header only implementation(s) of a fast sudoku solver.
+Single header and source implementation of a fast sudoku solver.
 
 ## To build:
-Edit flags of and run makefile.
+Run 'make', run 'make optimised' for additional optimisation (requires AVX compatible CPU).
 
 ## To use:
 Submit sudoku rows as args, valid tile values are 1-9 and '.' to represent an empty tile.
